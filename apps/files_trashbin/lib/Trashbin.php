@@ -44,6 +44,8 @@
 
 namespace OCA\Files_Trashbin;
 
+use OC\Files\Cache\Cache;
+use OC\Files\Cache\CacheQueryBuilder;
 use OC\Files\Filesystem;
 use OC\Files\ObjectStore\ObjectStoreStorage;
 use OC\Files\View;
@@ -936,11 +938,34 @@ class Trashbin {
 
 		if ($timestamp) {
 			// fetch for old versions
-			$matches = $view->searchRaw($filename . '.v%.d' . $timestamp);
+			$pattern = basename($filename) . '.v%.d' . $timestamp;
 			$offset = -strlen($timestamp) - 2;
 		} else {
-			$matches = $view->searchRaw($filename . '.v%');
+			$pattern = basename($filename) . '.v%';
 		}
+
+		// Manually fetch all versions from the file cache to be able to filter them by their parent
+		$cache = $storage->getCache('');
+		$query = new CacheQueryBuilder(
+			\OC::$server->getDatabaseConnection(),
+			\OC::$server->getSystemConfig(),
+			\OC::$server->getLogger(),
+			$cache
+		);
+		$normalizedParentPath = ltrim(Filesystem::normalizePath(dirname('files_trashbin/versions/'. $filename)), '/');
+		$parentId = $cache->getId($normalizedParentPath);
+		if ($parentId === -1) {
+			return [];
+		}
+
+		$query->selectFileCache()
+			->whereStorageId()
+			->andWhere($query->expr()->eq('parent', $query->createNamedParameter($parentId)))
+			->andWhere($query->expr()->iLike('name', $query->createNamedParameter($pattern)));
+
+		$matches =  array_map(function (array $data) {
+			return Cache::cacheEntryFromData($data, \OC::$server->getMimeTypeLoader());
+		}, $query->execute()->fetchAll());
 
 		if (is_array($matches)) {
 			foreach ($matches as $ma) {
@@ -948,7 +973,7 @@ class Trashbin {
 					$parts = explode('.v', substr($ma['path'], 0, $offset));
 					$versions[] = end($parts);
 				} else {
-					$parts = explode('.v', $ma);
+					$parts = explode('.v', $ma['path']);
 					$versions[] = end($parts);
 				}
 			}
