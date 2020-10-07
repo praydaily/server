@@ -45,6 +45,7 @@
 namespace OCA\Files_Trashbin;
 
 use OC\Files\Cache\Cache;
+use OC\Files\Cache\CacheEntry;
 use OC\Files\Cache\CacheQueryBuilder;
 use OC\Files\Filesystem;
 use OC\Files\ObjectStore\ObjectStoreStorage;
@@ -965,21 +966,21 @@ class Trashbin {
 			->andWhere($query->expr()->eq('parent', $query->createNamedParameter($parentId)))
 			->andWhere($query->expr()->iLike('name', $query->createNamedParameter($pattern)));
 
-		$matches =  array_map(function (array $data) {
+		/** @var CacheEntry[] $matches */
+		$matches = array_map(function (array $data) {
 			return Cache::cacheEntryFromData($data, \OC::$server->getMimeTypeLoader());
 		}, $query->execute()->fetchAll());
 
-		if (is_array($matches)) {
-			foreach ($matches as $ma) {
-				if ($timestamp) {
-					$parts = explode('.v', substr($ma['path'], 0, $offset));
-					$versions[] = end($parts);
-				} else {
-					$parts = explode('.v', $ma['path']);
-					$versions[] = end($parts);
-				}
+		foreach ($matches as $ma) {
+			if ($timestamp) {
+				$parts = explode('.v', substr($ma['path'], 0, $offset));
+				$versions[] = end($parts);
+			} else {
+				$parts = explode('.v', $ma['path']);
+				$versions[] = end($parts);
 			}
 		}
+
 		return $versions;
 	}
 
