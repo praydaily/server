@@ -160,6 +160,7 @@ class UserPlugin implements ISearchPlugin {
 						'shareType' => IShare::TYPE_USER,
 						'shareWith' => $uid,
 					],
+					'shareWithDisplayNameUnique' => !empty($userEmail) ? $userEmail : $uid,
 					'status' => $status,
 				];
 			} else {
@@ -182,6 +183,7 @@ class UserPlugin implements ISearchPlugin {
 							'shareType' => IShare::TYPE_USER,
 							'shareWith' => $uid,
 						],
+						'shareWithDisplayNameUnique' => !empty($userEmail) ? $userEmail : $uid,
 						'status' => $status,
 					];
 				}
@@ -221,6 +223,7 @@ class UserPlugin implements ISearchPlugin {
 							'shareType' => IShare::TYPE_USER,
 							'shareWith' => $user->getUID(),
 						],
+						'shareWithDisplayNameUnique' => $userEmail !== null && $userEmail !== '' ? $userEmail : $uid,
 						'status' => $status,
 					];
 				}
