@@ -24,9 +24,23 @@
 namespace OCA\Files_External\Config;
 
 use OC\Files\Mount\MountPoint;
+use OCA\Files_External\Lib\StorageConfig;
+use OCA\Files_External\Lib\Auth\Password\SessionCredentials;
 
 class ExternalMountPoint extends MountPoint {
+
+	/** @var StorageConfig */
+	private $storageConfig;
+
+	public function __construct($storage, $mountpoint, $arguments = null, $loader = null, $mountOptions = null, $mountId = null) {
+		if (isset($mountOptions['storageConfig'])) {
+			$this->storageConfig = $mountOptions['storageConfig'];
+			unset($mountOptions['storageConfig']);
+		}
+		parent::__construct($storage, $mountpoint, $arguments, $loader, $mountOptions, $mountId);
+	}
+
 	public function getMountType() {
-		return 'external';
+		return ($this->storageConfig->getAuthMechanism() instanceof SessionCredentials) ? 'external-session' : 'external';
 	}
 }

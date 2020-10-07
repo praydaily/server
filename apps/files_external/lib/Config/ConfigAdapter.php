@@ -166,7 +166,7 @@ class ConfigAdapter implements IMountProvider {
 					'/' . $user->getUID() . '/files' . $storageConfig->getMountPoint(),
 					null,
 					$loader,
-					$storageConfig->getMountOptions()
+					array_merge($storageConfig->getMountOptions(), ['storageConfig' => $storageConfig])
 				);
 			} else {
 				return new ExternalMountPoint(
@@ -174,7 +174,7 @@ class ConfigAdapter implements IMountProvider {
 					'/' . $user->getUID() . '/files' . $storageConfig->getMountPoint(),
 					null,
 					$loader,
-					$storageConfig->getMountOptions(),
+					array_merge($storageConfig->getMountOptions(), ['storageConfig' => $storageConfig]),
 					$storageConfig->getId()
 				);
 			}
