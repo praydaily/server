@@ -936,12 +936,14 @@ class Trashbin {
 			self::$scannedVersions = true;
 		}
 
+		$pattern = \OC::$server->getDatabaseConnection()->escapeLikeParameter(basename($filename));
 		if ($timestamp) {
 			// fetch for old versions
-			$pattern = basename($filename) . '.v%.d' . $timestamp;
-			$offset = -strlen($timestamp) - 2;
+			$escapedTimestamp = \OC::$server->getDatabaseConnection()->escapeLikeParameter($timestamp);
+			$pattern .= '.v%.d' . $escapedTimestamp;
+			$offset = -strlen($escapedTimestamp) - 2;
 		} else {
-			$pattern = basename($filename) . '.v%';
+			$pattern .= '.v%';
 		}
 
 		// Manually fetch all versions from the file cache to be able to filter them by their parent
