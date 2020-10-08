@@ -205,6 +205,8 @@ class UserPlugin implements ISearchPlugin {
 
 				if ($addUser) {
 					$status = [];
+					$uid = $user->getUID();
+					$userEmail = $user->getEMailAddress();
 					if (array_key_exists($user->getUID(), $userStatuses)) {
 						$userStatus = $userStatuses[$user->getUID()];
 						$status = [
