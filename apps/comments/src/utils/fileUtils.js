@@ -95,8 +95,6 @@ const sortCompare = function(fileInfo1, fileInfo2, key, asc = true) {
  * @returns {Object}
  */
 const genFileInfo = function(obj) {
-
-	console.info(obj);
 	const fileInfo = {}
 
 	Object.keys(obj).forEach(key => {

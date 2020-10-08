@@ -21,25 +21,36 @@
   -->
 
 <template>
-	<div :class="{ 'icon-loading': loading }">
-		<!-- error message -->
+	<div class="comments" :class="{ 'icon-loading': loading }">
+		<!-- Error message -->
 		<EmptyContent v-if="error" icon="icon-error">
 			{{ error }}
 		</EmptyContent>
 
 		<template v-else>
-			<RichContenteditable v-model="message" :auto-complete="autoComplete" />
+			<!-- Editor -->
+			<Comment v-bind="editorData"
+				:auto-complete="autoComplete"
+				:editor="true"
+				:file-info="fileInfo"
+				:message.sync="editorData.message"
+				class="comments__writer"
+				@new="onNewComment" />
 
-			<EmptyContent v-if="comments.length === 0" icon="icon-comment">
+			<EmptyContent v-if="comments.length === 0 && !loading" icon="icon-comment">
 				{{ t('comments', 'No comments yet, start the conversation!') }}
 			</EmptyContent>
 
-			<!-- comments -->
-			<Comment v-else v-for="comment in comments" :key="comment.id" :source="comment" />
-			<!-- <VirtualList
-				data-key="'uid'"
-				:data-sources="comments"
-				:data-component="Comment" /> -->
+			<!-- Comments -->
+			<Comment v-for="comment in comments"
+				v-else
+				:key="comment.id"
+				v-bind="comment"
+				:auto-complete="autoComplete"
+				:file-info="fileInfo"
+				:message.sync="comment.message"
+				class="comments__list"
+				@delete="onDelete" />
 		</template>
 	</div>
 </template>
@@ -47,14 +58,16 @@
 <script>
 import { generateOcsUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
-import VirtualList from 'vue-virtual-scroll-list'
+import VTooltip from 'v-tooltip'
+import Vue from 'vue'
 
-// import Avatar from '@nextcloud/vue/dist/Components/Avatar'
 import EmptyContent from '@nextcloud/vue/dist/Components/EmptyContent'
-import RichContenteditable from '@nextcloud/vue/dist/Components/RichContenteditable'
 
 import Comment from '../components/Comment'
-import fetchComments from '../services/Comments'
+import getComments from '../services/GetComments'
+import { getCurrentUser } from '@nextcloud/auth'
+
+Vue.use(VTooltip)
 
 export default {
 	name: 'CommentsTab',
@@ -63,8 +76,6 @@ export default {
 		// Avatar,
 		Comment,
 		EmptyContent,
-		RichContenteditable,
-		VirtualList,
 	},
 
 	data() {
@@ -75,7 +86,12 @@ export default {
 			fileInfo: null,
 			offset: 0,
 			comments: [],
+
 			message: '',
+			editorData: {
+				actorDisplayName: getCurrentUser().displayName,
+				actorId: getCurrentUser().uid,
+			},
 
 			Comment,
 		}
@@ -103,7 +119,7 @@ export default {
 				this.loading = true
 
 				// Fetch comments
-				this.comments = await fetchComments(this.fileInfo.id)
+				this.comments = await getComments(this.fileInfo.id)
 			} catch (error) {
 				this.error = t('comments', 'Unable to load the comments list')
 				console.error('Error loading the comments list', error)
@@ -128,6 +144,28 @@ export default {
 				},
 			})
 			return callback(results.data.ocs.data)
+		},
+
+		/**
+		 * Add newly created comment to the list
+		 * @param {Object} comment the new comment
+		 */
+		onNewComment(comment) {
+			this.comments.unshift(comment)
+			this.message = ''
+		},
+
+		/**
+		 * Remove deleted comment from the list
+		 * @param {number} id the deleted comment
+		 */
+		onDelete(id) {
+			const index = this.comments.findIndex(comment => comment.id === id)
+			if (index > -1) {
+				this.comments.splice(index, 1)
+			} else {
+				console.error('Could not find the deleted comment in the list', id)
+			}
 		},
 
 		/**

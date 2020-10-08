@@ -20,49 +20,275 @@
   -
   -->
 <template>
-	<div class="comment">
+	<div v-show="!deleted"
+		:class="{'comment--loading': loading}"
+		class="comment">
+		<!-- Comment header toolbar -->
 		<div class="comment__header">
-			<Avatar class="comment__avatar" :display-name="source.actorDisplayName" :user="source.actorId" />
-			<span class="comment__author">{{ source.actorDisplayName }}</span>
-			<Actions class="comment__actions">
-				<ActionButton icon="icon-rename">
-					{{ t('comments', 'Edit comment') }}
-				</ActionButton>
-				<ActionButton icon="icon-delete">
-					{{ t('comments', 'Delete comment') }}
+			<!-- Author -->
+			<Avatar class="comment__avatar"
+				:display-name="actorDisplayName"
+				:user="actorId"
+				:size="32" />
+			<span class="comment__author">{{ actorDisplayName }}</span>
+
+			<!-- Comment actions,
+				show if we have a message id and current user is author -->
+			<Actions v-if="isOwnComment && id && !loading" class="comment__actions">
+				<template v-if="!editing">
+					<ActionButton
+						:close-after-click="true"
+						icon="icon-rename"
+						@click="onEdit">
+						{{ t('comments', 'Edit comment') }}
+					</ActionButton>
+					<ActionSeparator />
+					<ActionButton
+						:close-after-click="true"
+						icon="icon-delete"
+						@click="onDeleteWithUndo">
+						{{ t('comments', 'Delete comment') }}
+					</ActionButton>
+				</template>
+
+				<ActionButton v-else
+					icon="icon-close"
+					@click="onEditCancel">
+					{{ t('comments', 'Cancel edit') }}
 				</ActionButton>
 			</Actions>
-			<span class="comment__timestamp"></span>
+
+			<!-- Show loading if we're editing or deleting, not on new ones -->
+			<div v-if="id && loading" class="comment_loading icon-loading-small" />
+
+			<!-- Relative time to the comment creation -->
+			<Moment v-else-if="creationDateTime" class="comment__timestamp" :timestamp="timestamp" />
 		</div>
-		<div class="comment__message">
-			{{ source.message }}
+
+		<!-- Message editor -->
+		<div class="comment__message" v-if="editor || editing">
+			<RichContenteditable v-model="localMessage" :auto-complete="autoComplete" :contenteditable="!loading" />
+			<input v-tooltip="t('comments', 'Post comment')"
+				:class="loading ? 'icon-loading-small' :'icon-confirm'"
+				class="comment__submit"
+				type="submit"
+				:disabled="isEmptyMessage"
+				value=""
+				@click="onSubmit">
 		</div>
+
+		<!-- Message content -->
+		<!-- The html is escaped and sanitized before rendering -->
+		<!-- eslint-disable-next-line vue/no-v-html-->
+		<div v-else class="comment__message" v-html="renderedContent" />
 	</div>
 </template>
 
 <script>
-import Avatar from '@nextcloud/vue/dist/Components/Avatar'
-import Actions from '@nextcloud/vue/dist/Components/Actions'
+import { getCurrentUser } from '@nextcloud/auth'
+import moment from 'moment'
+
 import ActionButton from '@nextcloud/vue/dist/Components/ActionButton'
+import Actions from '@nextcloud/vue/dist/Components/Actions'
+import ActionSeparator from '@nextcloud/vue/dist/Components/ActionSeparator'
+import Avatar from '@nextcloud/vue/dist/Components/Avatar'
+import RichContenteditable from '@nextcloud/vue/dist/Components/RichContenteditable'
+import RichEditorMixin from '@nextcloud/vue/dist/Mixins/richEditor'
+
+import Moment from './Moment'
+import CommentMixin from '../mixins/CommentMixin'
 
 export default {
 	name: 'Comment',
+
+	components: {
+		ActionButton,
+		Actions,
+		ActionSeparator,
+		Avatar,
+		Moment,
+		RichContenteditable,
+	},
+
+	mixins: [RichEditorMixin, CommentMixin],
+
 	props: {
 		source: {
 			type: Object,
 			default: () => ({}),
 		},
+		actorDisplayName: {
+			type: String,
+			required: true,
+		},
+		actorId: {
+			type: String,
+			required: true,
+		},
+		creationDateTime: {
+			type: String,
+			default: null,
+		},
+
+		/**
+		 * Force the editor display
+		 */
+		editor: {
+			type: Boolean,
+			default: false,
+		},
+
+		/**
+		 * Provide the autocompletion data
+		 */
+		autoComplete: {
+			type: Function,
+			required: true,
+		},
 	},
 
-	components: {
-		ActionButton,
-		Actions,
-		Avatar,
+	data() {
+		return {
+			// Only change data locally and update the original
+			// parent data when the request is sent and resolved
+			localMessage: '',
+		}
+	},
+
+	computed: {
+
+		/**
+		 * Is the current user the author of this comment
+		 * @returns {boolean}
+		 */
+		isOwnComment() {
+			return getCurrentUser().uid === this.actorId
+		},
+
+		/**
+		 * Rendered content as html string
+		 * @returns {string}
+		 */
+		renderedContent() {
+			if (this.isEmptyMessage) {
+				return ''
+			}
+			return this.renderContent(this.localMessage)
+		},
+
+		isEmptyMessage() {
+			return !this.localMessage || this.localMessage.trim() === ''
+		},
+
+		timestamp() {
+			// seconds, not milliseconds
+			return parseInt(moment(this.creationDateTime).format('x'), 10) / 1000
+		},
+	},
+
+	watch: {
+		// If the data change, update the local value
+		message(message) {
+			console.debug('Message changed', message)
+			this.updateLocalMessage(message)
+		},
+	},
+
+	beforeMount() {
+		// Init localMessage
+		this.updateLocalMessage(this.message)
+	},
+
+	methods: {
+		/**
+		 * Update local Message on outer change
+		 * @param {string} message the message to set
+		 */
+		updateLocalMessage(message) {
+			this.localMessage = message.toString()
+		},
+
+		/**
+		 * Dispatch message between edit and create
+		 */
+		onSubmit() {
+			if (this.editor) {
+				this.onNewComment(this.localMessage)
+				return
+			}
+			this.onEditComment(this.localMessage)
+		},
 	},
 
 }
 </script>
 
 <style lang="scss" scoped>
+$comment-padding: 10px;
+
+.comment {
+	position: relative;
+	padding: $comment-padding 0 $comment-padding * 1.5;
+
+	&__header {
+		display: flex;
+		align-items: center;
+		min-height: 44px;
+		padding: $comment-padding / 2 0;
+	}
+
+	&__author,
+	&__actions {
+		margin-left: $comment-padding !important;
+	}
+
+	&__author {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		color: var(--color-text-maxcontrast);
+	}
+
+	&_loading,
+	&__timestamp {
+		margin-left: auto;
+		color: var(--color-text-maxcontrast);
+	}
+
+	&__message {
+		position: relative;
+		// Avatar size, align with author name
+		padding-left: 32px + $comment-padding;
+	}
+
+	&__submit {
+		position: absolute;
+		right: 0;
+		bottom: 0;
+		width: 44px;
+		height: 44px;
+		// Align with input border
+		margin: 1px;
+		cursor: pointer;
+		opacity: .7;
+		border: none;
+		background-color: transparent !important;
+
+		&:disabled {
+			cursor: not-allowed;
+			opacity: .5;
+		}
+
+		&:focus,
+		&:hover {
+			opacity: 1;
+		}
+	}
+}
+
+.rich-contenteditable__input {
+	margin: 0;
+	padding: $comment-padding;
+}
 
 </style>

@@ -1,5 +1,5 @@
 /**
- * @copyright Copyright (c) 2019 John Molakvoæ <skjnldsv@protonmail.com>
+ * @copyright Copyright (c) 2020 John Molakvoæ <skjnldsv@protonmail.com>
  *
  * @author John Molakvoæ <skjnldsv@protonmail.com>
  *
@@ -22,7 +22,6 @@
 
 import { parseXML, prepareFileFromProps } from 'webdav/dist/node/interface/dav'
 import { processResponsePayload } from 'webdav/dist/node/response'
-import { normaliseHREF, normalisePath } from 'webdav/dist/node/url'
 import client from './DavClient'
 import { genFileInfo } from '../utils/fileUtils'
 
@@ -41,7 +40,8 @@ export default async function(fileId, options = {}) {
 	return await client.customRequest(fileId.toString(), Object.assign({
 		method: 'REPORT',
 		data: `<?xml version="1.0"?>
-			<oc:filter-comments  xmlns:d="DAV:"
+			<oc:filter-comments
+				xmlns:d="DAV:"
 				xmlns:oc="http://owncloud.org/ns"
 				xmlns:nc="http://nextcloud.org/ns"
 				xmlns:ocs="http://open-collaboration-services.org/ns">
@@ -49,7 +49,7 @@ export default async function(fileId, options = {}) {
 				<oc:offset>${options.offset || 0}</oc:offset>
 			</oc:filter-comments>`,
 	}, options))
-		// See example on how it's done normaly 
+		// See example on how it's done normaly
 		// https://github.com/perry-mitchell/webdav-client/blob/9de2da4a2599e06bd86c2778145b7ade39fe0b3c/source/interface/stat.js#L19
 		// Waiting for proper REPORT integration https://github.com/perry-mitchell/webdav-client/issues/207
 		.then(res => {
